@@ -15,7 +15,7 @@
     lambda = v + 102.9
     decl = 22.8 * Math.sin(toRadians(lambda)) + 0.6 * Math.pow(Math.sin(toRadians(lambda)),3)
 
-    t = time.getUTCHours()
+    t = time.getUTCHours() + time.getUTCMinutes()/60
     b = decl
     l = -15 * t
     termFn = (psi) ->
