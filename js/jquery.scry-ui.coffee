@@ -45,56 +45,91 @@
     })
 
 
-
-
   $.fn.extend({
-    scryMap: (opts) ->
-      default_opts = {
-        labels: ["event"]
-        server: 'http://localhost:3000'
-        mark_lifetime: 20000
-        showdaynight: true
+    scryMap: (args...) ->
+      events = {
       }
 
-      opts = $.extend(default_opts, opts)
+      addLabels = (labels) ->
+        socket.emit("register", labels)
+        for label in labels
+          events.registerLabel?(label)
+      removeLabels = (labels) ->
+        socket.emit("deregister", labels)
+        for label in labels
+          events.deregisterLabel?(label)
 
-      socket = io.connect(opts.server)
-      map = null
+      if $.isPlainObject(args[0])
+        opts = args[0]
+        default_opts = {
+          labels: ["event"]
+          server: 'http://localhost:3000'
+          mark_lifetime: 20000
+          showdaynight: true
+          events: {
+            "registerLabel": null
+            "deregisterLabel": null
+          }
+        }
 
-      # register us for the given labels
-      socket.emit("register", opts.labels)
-      socket.on("data", (data) ->
-        addMarker(map, {lat:data.ll[0], lng:data.ll[1]})
-      )
+        opts = $.extend(default_opts, opts)
 
-      mapOptions = {
-        center: new google.maps.LatLng(30, 0),
-        zoom: 3,
-        mapTypeId: google.maps.MapTypeId.HYBRID
-      }
-      map = new google.maps.Map(@[0], mapOptions)
+        events = $.extend(events, opts.events)
 
-      addTerminator = ->
-        poly = getMapTerminator()
-        poly.setMap(map)
-        setInterval( =>
-          poly?.setMap(null)
+        socket = io.connect(opts.server)
+        map = null
+
+        # register us for the given labels
+        addLabels(opts.labels)
+        socket.on("data", (data) ->
+          addMarker(map, {lat:data.ll[0], lng:data.ll[1]})
+        )
+
+        mapOptions = {
+          center: new google.maps.LatLng(30, 0),
+          zoom: 3,
+          mapTypeId: google.maps.MapTypeId.HYBRID
+        }
+        map = new google.maps.Map(@[0], mapOptions)
+
+        addTerminator = ->
           poly = getMapTerminator()
           poly.setMap(map)
-        , 30000)
+          setInterval( =>
+            poly?.setMap(null)
+            poly = getMapTerminator()
+            poly.setMap(map)
+          , 30000)
 
-      if opts.showdaynight
-        addTerminator()
+        if opts.showdaynight
+          addTerminator()
 
-      addMarker = (map, latlng) ->
-        marker = new google.maps.Marker({
-          position: new google.maps.LatLng(latlng.lat, latlng.lng),
-          map: map,
-          title:"Hello World!"
-        })
-        window.setTimeout( =>
-          marker.setMap(null)
-        , opts.mark_lifetime)
+        addMarker = (map, latlng) ->
+          marker = new google.maps.Marker({
+            position: new google.maps.LatLng(latlng.lat, latlng.lng),
+            map: map,
+            title:"Hello World!"
+          })
+          window.setTimeout( =>
+            marker.setMap(null)
+          , opts.mark_lifetime)
+
+        @data("opts", opts)
+        @data("events", events)
+        @data("socket", socket)
+        @data("map", map)
+      else
+        opts = @data("opts")
+        events = @data("events")
+        socket = @data("socket")
+        map = @data("map")
+        if $.type(args[0]) == "string"
+          verb = args[0]
+
+          if verb == "register" and $.isArray(args[1])
+            addLabels(args[1])
+          if verb == "deregister" and $.isArray(args[1])
+            removeLabels(args[1])
 
   })
 )(jQuery)
