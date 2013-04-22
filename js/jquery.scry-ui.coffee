@@ -3,6 +3,33 @@
   toRadians = (deg) -> deg * Math.PI / 180
   toDegrees = (rad) -> rad * 180 / Math.PI
 
+  colors = (i) ->
+    return [
+      '009ada', # blue
+      '8fc53b', # green
+      'f7953e', # orange
+      'e44793', # pink
+      'a04734', # purple
+      'f73e3e', # red
+      '14e3e1', # teal
+      '0048da', # royal blue
+      'f4ed3b', # yellow
+      '768292', # slate
+
+      '33cc33',
+      '0099ff',
+      'ff00ff',
+      'ff9933',
+      '00ff99',
+      '3366ff',
+      'ff3399',
+      'ffff00',
+      '33cccc',
+      '9966ff',
+      'ff5050',
+      '99ff33'
+    ][i]
+
   DAY_MS = 86400000
 
   getMapTerminator = (time) ->
@@ -47,16 +74,19 @@
 
   $.fn.extend({
     scryMap: (args...) ->
-      events = {
-      }
+      events = {}
+
+      colorMapping = {}
 
       addLabels = (labels) ->
         socket.emit("register", labels)
         for label in labels
-          events.registerLabel?(label)
+          colorMapping[label] = colors((k for k of colorMapping).length)
+          events.registerLabel?(label,{color:colorMapping[label]})
       removeLabels = (labels) ->
         socket.emit("deregister", labels)
         for label in labels
+          delete colorMapping[label]
           events.deregisterLabel?(label)
 
       if $.isPlainObject(args[0])
@@ -65,6 +95,8 @@
           labels: ["event"]
           server: 'http://localhost:3000'
           mark_lifetime: 20000
+          label_sort_priority: (a,b) ->
+             b.split('@').length - a.split('@').length
           showdaynight: true
           events: {
             "registerLabel": null
@@ -82,7 +114,11 @@
         # register us for the given labels
         addLabels(opts.labels)
         socket.on("data", (data) ->
-          addMarker(map, {lat:data.ll[0], lng:data.ll[1]})
+          addMarker(
+            map,
+            {lat:data.ll[0], lng:data.ll[1]},
+            colorMapping[data.labels.sort(opts.label_sort_priority)[0]]
+          )
         )
 
         mapOptions = {
@@ -104,11 +140,23 @@
         if opts.showdaynight
           addTerminator()
 
-        addMarker = (map, latlng) ->
+        addMarker = (map, latlng, color) ->
           marker = new google.maps.Marker({
+            icon: new google.maps.MarkerImage(
+              "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|#{color}",
+              new google.maps.Size(21, 34),
+              new google.maps.Point(0,0),
+              new google.maps.Point(10, 34)
+            )
+            shadow: new google.maps.MarkerImage(
+              "http://chart.apis.google.com/chart?chst=d_map_pin_shadow",
+              new google.maps.Size(40, 37),
+              new google.maps.Point(0, 0),
+              new google.maps.Point(12, 35)
+            )
             position: new google.maps.LatLng(latlng.lat, latlng.lng),
             map: map,
-            title:"Hello World!"
+            title:""
           })
           window.setTimeout( =>
             marker.setMap(null)
@@ -118,11 +166,14 @@
         @data("events", events)
         @data("socket", socket)
         @data("map", map)
+        @data("map", colorMapping)
       else
         opts = @data("opts")
         events = @data("events")
         socket = @data("socket")
         map = @data("map")
+        colorMapping = @data("map")
+
         if $.type(args[0]) == "string"
           verb = args[0]
 
